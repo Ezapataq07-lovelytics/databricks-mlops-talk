@@ -10,6 +10,7 @@ Project goal:
 - Demonstrate how to move from feature engineering to training, validation, deployment, batch inference, and monitoring/retraining with Databricks Asset Bundles, Unity Catalog, and MLflow.
 
 ## Documentation Map
+- Talk opener notebook: [FromNotebookToProduction_Starter.ipynb](FromNotebookToProduction_Starter.ipynb)
 - Model card: [docs/model-card.md](docs/model-card.md)
 - Architecture: [docs/architecture.md](docs/architecture.md)
 - Operations runbook: [docs/runbook.md](docs/runbook.md)
