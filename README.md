@@ -1,116 +1,92 @@
-# mlops_dbx
+# Databricks MLOps Talk: End-to-End Telco Churn ML Project
 
-This directory contains an ML project based on the default
-[Databricks MLOps Stacks](https://github.com/databricks/mlops-stacks),
-defining a production-grade ML pipeline for automated retraining and batch inference of an ML model on tabular data.
-The "Getting Started" docs can be found at https://docs.databricks.com/dev-tools/bundles/mlops-stacks.html.
+This repository showcases an end-to-end ML lifecycle on Databricks for a workshop/talk audience.
 
-See the full pipeline structure below. The [MLOps Stacks README](https://github.com/databricks/mlops-stacks/blob/main/Pipeline.md)
-contains additional details on how ML pipelines are tested and deployed across each of the dev, staging, prod environments below.
+Primary audience:
+- ML engineers
+- Data scientists
 
-![MLOps Stacks diagram](docs/images/mlops-stack-summary.png)
+Project goal:
+- Demonstrate how to move from feature engineering to training, validation, deployment, batch inference, and monitoring/retraining with Databricks Asset Bundles, Unity Catalog, and MLflow.
 
+## Documentation Map
+- Model card: [docs/model-card.md](docs/model-card.md)
+- Architecture: [docs/architecture.md](docs/architecture.md)
+- Operations runbook: [docs/runbook.md](docs/runbook.md)
 
-## Code structure
-This project contains the following components:
+Legacy Databricks MLOps Stacks docs were preserved with the suffix _mlopstacks.
 
-| Component                  | Description                                                                                                                                                                                                                                                                                                                                             |
-|----------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ML Code                    | Example ML project code, with unit tested Python modules and notebooks                                                                                                                                                                                                                                                                             |
-| ML Resources as Code | ML pipeline resources (training and batch inference jobs with schedules, etc) configured and deployed through [databricks CLI bundles](https://docs.databricks.com/dev-tools/cli/bundle-cli.html)                                                                                              |
-| CI/CD                      | [GitHub Actions](https://github.com/actions) workflows  to test and deploy ML code and resources
-                                |
+## Repository Structure
+- Core ML project: mlops_dbx
+- CI/CD workflows: .github/workflows
+- Workshop docs: docs
 
-contained in the following files:
+Key modules:
+- Feature engineering logic: mlops_dbx/feature_engineering/features/compute_features.py
+- Validation thresholds and custom metrics: mlops_dbx/validation/validation.py
+- Batch inference scoring helper: mlops_dbx/deployment/batch_inference/predict.py
+- Model deployment aliasing: mlops_dbx/deployment/model_deployment/deploy.py
+- Monitoring metric violation SQL template: mlops_dbx/monitoring/metric_violation_check_query.py
 
-```
-mlops_dbx        <- Root directory. Both monorepo and polyrepo are supported.
-│
-├── mlops_dbx       <- Contains python code, notebooks and ML resources related to one ML project. 
-│   │
-│   ├── requirements.txt        <- Specifies Python dependencies for ML code (for example: model training, batch inference).
-│   │
-│   ├── databricks.yml          <- databricks.yml is the root bundle file for the ML project that can be loaded by databricks CLI bundles. It defines the bundle name, workspace URL and resource config component to be included.
-│   │
-│   ├── training                <- Training folder contains Notebook that trains and registers the model with feature store support.
-│   │
-│   ├── feature_engineering     <- Feature computation code (Python modules) that implements the feature transforms.
-│   │                              The output of these transforms get persisted as Feature Store tables. Most development
-│   │                              work happens here.
-│   │
-│   ├── validation              <- Optional model validation step before deploying a model.
-│   │
-│   ├── monitoring              <- Model monitoring, feature monitoring, etc.
-│   │
-│   ├── deployment              <- Deployment and Batch inference workflows
-│   │   │
-│   │   ├── batch_inference     <- Batch inference code that will run as part of scheduled workflow.
-│   │   │
-│   │   ├── model_deployment    <- As part of CD workflow, deploy the registered model by assigning it the appropriate alias.
-│   │
-│   │
-│   ├── tests                   <- Unit tests for the ML project, including the modules under `features`.
-│   │
-│   ├── resources               <- ML resource (ML jobs, MLflow models) config definitions expressed as code, across dev/staging/prod/test.
-│       │
-│       ├── model-workflow-resource.yml                <- ML resource config definition for model training, validation, deployment workflow
-│       │
-│       ├── batch-inference-workflow-resource.yml      <- ML resource config definition for batch inference workflow
-│       │
-│       ├── feature-engineering-workflow-resource.yml  <- ML resource config definition for feature engineering workflow
-│       │
-│       ├── ml-artifacts-resource.yml                  <- ML resource config definition for model and experiment
-│       │
-│       ├── monitoring-resource.yml           <- ML resource config definition for quality monitoring workflow
-│
-├── .github                     <- Configuration folder for CI/CD using GitHub Actions.  The CI/CD workflows deploy ML resources defined in the `./resources/*` folder with databricks CLI bundles.
-│
-├── docs                        <- Contains documentation for the repo.
-│
-├── cicd.tar.gz                 <- Contains CI/CD bundle that should be deployed by deploy-cicd.yml to set up CI/CD for projects.
-```
+## ML Lifecycle Implemented
+1. Load and prepare raw telco data into Unity Catalog tables.
+2. Generate customer features with Spark and write feature tables.
+3. Train and register a churn model in Unity Catalog Model Registry.
+4. Validate model quality (custom recall threshold currently configured).
+5. Deploy by assigning model alias (champion).
+6. Run batch inference and write predictions to Delta tables.
+7. Monitor inference quality and trigger retraining when threshold conditions are met.
 
-## Using this repo
+## Databricks Workflows in Bundle Resources
+- Feature engineering workflow: mlops_dbx/resources/feature-engineering-workflow-resource.yml
+- Model workflow (train, validate, deploy): mlops_dbx/resources/model-workflow-resource.yml
+- Batch inference workflow: mlops_dbx/resources/batch-inference-workflow-resource.yml
+- Monitoring and retraining workflow: mlops_dbx/resources/monitoring-resource.yml
+- Model registry artifacts: mlops_dbx/resources/ml-artifacts-resource.yml
 
-The table below links to detailed docs explaining how to use this repo for different use cases.
+## Deployment Targets
+Bundle targets in mlops_dbx/databricks.yml:
+- dev (default)
+- staging
+- prod
+- test
 
+Current catalog variable pattern:
+- mlops_dbx_talk_${bundle.target}
 
-This project comes with example ML code to train, validate and deploy a regression model to predict NYC taxi fares.
-If you're a data scientist just getting started with this repo for a brand new ML project, we recommend 
-adapting the provided example code to your ML problem. Then making and 
-testing ML code changes on Databricks or your local machine. Follow the instructions from
-the [project README](./mlops_dbx/README.md).
- 
+## CI/CD Summary
+- PR checks:
+  - Unit tests (pytest)
+  - Bundle validate for staging and prod
+  - Integration deployment and workflow runs against test target in staging workspace
+- Main branch:
+  - Deploy to staging
+- Release branch:
+  - Deploy to prod
 
-When you're ready to deploy production training/inference
-pipelines, ask your ops team to follow the [MLOps setup guide](docs/mlops-setup.md) to configure CI/CD and deploy 
-production ML pipelines.
+See workflows in .github/workflows for exact behavior.
 
-After that, follow the [ML pull request guide](docs/ml-pull-request.md)
- and [ML resource config guide](mlops_dbx/resources/README.md)  to propose, test, and deploy changes to production ML code (e.g. update model parameters)
-or pipeline resources (e.g. use a larger instance type for model training) via pull request.
+## Quickstart
+1. Install dependencies:
+   - pip install -r mlops_dbx/requirements.txt
+   - pip install -r test-requirements.txt
+2. Run unit tests:
+   - cd mlops_dbx
+   - pytest
+3. Validate Databricks bundle:
+   - databricks bundle validate -t dev
+4. Deploy bundle:
+   - databricks bundle deploy -t dev
 
-| Role                          | Goal                                                                         | Docs                                                                                                                                                                |
-|-------------------------------|------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Data Scientist                | Get started writing ML code for a brand new project                          | [project README](./mlops_dbx/README.md) |
-| MLOps / DevOps                | Set up CI/CD for the current ML project   | [MLOps setup guide](docs/mlops-setup.md)                                                                                                                            |
-| Data Scientist                | Update production ML code (e.g. model training logic) for an existing project | [ML pull request guide](docs/ml-pull-request.md)                                                                                                                    |
-| Data Scientist                | Modify production model ML resources, e.g. model training or inference jobs  | [ML resource config guide](mlops_dbx/resources/README.md)  |
+## Known Workshop Constraints
+- This project is optimized for educational demonstration, not strict production hardening.
+- Notebook-driven orchestration is intentionally transparent for teaching.
+- Some resource files still include TODO comments from template origins.
+- Monitoring thresholds and runbook severities should be tuned per real business context.
 
-## Setting up CI/CD
-This stack comes with a workflow to set up CI/CD for projects that can be found in
-
-`.github/workflows/deploy-cicd.yml`.
-
-
-To set up CI/CD for projects that were created through MLOps Stacks with the `Project_Only` parameter, 
-run the above mentioned workflow, specifying the `project_name` as a parameter. For example, for the monorepo case:
-
-1. Setup your repository by initializing MLOps Stacks via Databricks CLI with the `CICD_and_Project` or `CICD_Only` parameter.
-2. Follow the [MLOps Setup Guide](./docs/mlops-setup.md) to setup authentication and get the repo ready for CI/CD.
-3. Create a new project by initializing MLOps Stacks again but this time with the `Project_Only` parameter.
-4. Run the `deploy-cicd.yml` workflow with the `project_name` parameter set to the name of the project you want to set up CI/CD for.
-
-
-NOTE: This project has already been initialized with an instantiation of the above workflow, so there's no
-need to run it again for project `mlops_dbx`.
+## Preserved Legacy Docs
+Original stack docs were renamed and retained, for example:
+- README_mlopstacks.md
+- docs/mlops-setup_mlopstacks.md
+- mlops_dbx/README_mlopstacks.md
+- mlops_dbx/resources/README_mlopstacks.md
