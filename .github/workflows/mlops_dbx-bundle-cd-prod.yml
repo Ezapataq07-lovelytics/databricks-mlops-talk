@@ -25,7 +25,7 @@ jobs:
     concurrency: mlops_dbx-prod-bundle-job
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: databricks/setup-cli@v1.8.0
       - name: Validate Bundle For Prod
         id: validate
